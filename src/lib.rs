@@ -18,42 +18,45 @@ use syn::{
 
 /// A procedural macro to conditionally append a suffix to method names in `.await` expressions.
 ///
-/// The `suffix` macro enables writing code that compiles for both asynchronous and blocking contexts,
-/// making it an essential tool when paired with the `bisync` crate. It takes two arguments: a suffix
-/// string and an expression. When the `async` feature is enabled, it appends the suffix to method names
-/// in `.await` calls within the expression. When the `blocking` feature is enabled (and `async` is not),
-/// the original expression is used unchanged.
+/// The `suffix` macro is designed to work in conjunction with the `#[bisync]` attribute from the `bisync` crate,
+/// enabling functions to support both asynchronous and blocking execution models based on feature flags.
+///
+/// When used within a function annotated with `#[bisync]`, the `suffix` macro ensures that method calls
+/// in `.await` expressions are adapted to the correct execution model:
+///
+/// - With the `async` feature enabled, it appends the specified suffix (e.g., `"_async"`) to method names in `.await` calls,
+///   ensuring the async version of the method is invoked.
+/// - With the `blocking` feature enabled (and `async` disabled), the original method name is preserved without the suffix,
+///   and the `#[bisync]` attribute removes the `.await` from the expression, transforming the function into a synchronous
+///   version that calls the blocking method directly.
 ///
 /// # Usage with `bisync`
 ///
-/// The macro is typically used within functions annotated with `#[bisync]`, which transforms them to
-/// support both async and blocking modes. The `suffix` macro ensures that method calls within these
-/// functions adapt to the correct execution model based on feature flags. For example, in the
-/// `axp192-dd` library, it’s used to switch between async and blocking method implementations.
-///
-/// ## Example from `axp192-dd`
+/// Below is an example from the `axp192-dd` library:
 ///
 /// ```ignore
 /// #[bisync]
 /// pub async fn get_battery_charge_current_ma(&mut self) -> Result<f32, AxpError<I2CBusErr>> {
 ///     let raw_fieldset = suffix!("_async", self.ll.battery_charge_current_adc().read().await?);
-///     let adc_val = adc_13Absolutelybit_from_raw_u16(raw_fieldset.raw());
+///     let adc_val = adc_13bit_from_raw_u16(raw_fieldset.raw());
 ///     Ok(adc_val as f32 * 0.5)
 /// }
 /// ```
 ///
 /// In this scenario:
-/// - With the `async` feature enabled, the expression becomes
-///   `self.ll.battery_charge_current_adc().read_async().await?`, calling an async method.
-/// - With the `blocking` feature enabled (and `async` disabled), it remains
-///   `self.ll.battery_charge_current_adc().read().await?`, typically handled by a blocking method.
+/// - **Async Context**: When the `async` feature is enabled, the `suffix` macro transforms the expression to
+///   `self.ll.battery_charge_current_adc().read_async().await?`, calling the asynchronous `read_async` method.
+/// - **Blocking Context**: When the `blocking` feature is enabled (and `async` disabled), the `suffix` macro leaves the
+///   method name as `read` (no suffix is appended), and the `#[bisync]` attribute removes the `.await`, resulting in
+///   `self.ll.battery_charge_current_adc().read()?`. Here, `read` is expected to be a blocking method provided by the
+///   underlying implementation.
 ///
 /// # Notes
 ///
 /// - **Arguments**: The macro requires a string literal suffix (e.g., `"_async"`) and a valid Rust expression.
-/// - **Feature Flags**: Define `async` and `blocking` features in your crate for conditional compilation.
-/// - **Method Definitions**: Ensure corresponding methods (e.g., `read` and `read_async`) are implemented
-///   to match the execution model when using `bisync`.
+/// - **Feature Flags**: Ensure that `async` and `blocking` features are defined in your crate for conditional compilation.
+/// - **Method Definitions**: Corresponding methods (e.g., `read` for blocking and `read_async` for async) must be
+///   implemented to match the execution model when using `bisync`.
 #[proc_macro]
 pub fn suffix(input: TokenStream) -> TokenStream {
     let parsed_input = parse_macro_input!(input as SuffixMacroInput);
