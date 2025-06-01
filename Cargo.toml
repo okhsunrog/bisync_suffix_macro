@@ -1,0 +1,17 @@
+[package]
+name = "bisync_suffix_macro"
+version = "0.1.0"
+edition = "2024"
+authors = ["Danila Gornushko <me@okhsunrog.dev>"]
+description = ""
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/okhsunrog/bisync_suffix_macro"
+readme = "README.md"
+keywords = ["async", "macros", "proc-macros"]
+categories = ["development-tools::procedural-macro-helpers"]
+documentation = "https://docs.rs/bisync_suffix_macro/"
+
+[dependencies]
+syn = { version = "2.0", features = ["full", "visit-mut"] }
+quote = "1.0"
+proc-macro2 = "1.0"
