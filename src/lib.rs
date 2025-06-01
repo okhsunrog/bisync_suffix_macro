@@ -1,10 +1,11 @@
 //! `bisync_suffix_macro` provides a procedural macro to conditionally append suffixes to method names
 //! in `.await` expressions, enabling dual support for asynchronous and blocking code paths.
 //!
-//! This macro is particularly useful in libraries that need to provide both async and blocking APIs,
-//! allowing the same codebase to be compiled for different execution models based on feature flags.
+//! This macro is designed to work seamlessly with the `bisync` crate, which allows functions to support
+//! both async and blocking execution models based on feature flags. It is particularly useful in libraries
+//! like `axp192-dd`, where a single codebase needs to provide both async and blocking APIs.
 //!
-//! For more details, see the documentation for the [`suffix`] macro.
+//! For detailed usage, see the [`suffix`] macro documentation.
 
 use proc_macro::TokenStream;
 use quote::quote;
@@ -17,27 +18,42 @@ use syn::{
 
 /// A procedural macro to conditionally append a suffix to method names in `.await` expressions.
 ///
-/// This macro is designed to facilitate writing code that can be compiled for both asynchronous
-/// and blocking contexts. It takes a suffix string and an expression, and transforms the expression
-/// by appending the suffix to method names in `.await` calls when the `async` feature is enabled.
-/// When the `blocking` feature is enabled (and `async` is not), the original expression is used without modification.
+/// The `suffix` macro enables writing code that compiles for both asynchronous and blocking contexts,
+/// making it an essential tool when paired with the `bisync` crate. It takes two arguments: a suffix
+/// string and an expression. When the `async` feature is enabled, it appends the suffix to method names
+/// in `.await` calls within the expression. When the `blocking` feature is enabled (and `async` is not),
+/// the original expression is used unchanged.
 ///
-/// # Usage
+/// # Usage with `bisync`
+///
+/// The macro is typically used within functions annotated with `#[bisync]`, which transforms them to
+/// support both async and blocking modes. The `suffix` macro ensures that method calls within these
+/// functions adapt to the correct execution model based on feature flags. For example, in the
+/// `axp192-dd` library, it’s used to switch between async and blocking method implementations.
+///
+/// ## Example from `axp192-dd`
 ///
 /// ```ignore
-/// suffix!("_async", self.some_method().await)
+/// #[bisync]
+/// pub async fn get_battery_charge_current_ma(&mut self) -> Result<f32, AxpError<I2CBusErr>> {
+///     let raw_fieldset = suffix!("_async", self.ll.battery_charge_current_adc().read().await?);
+///     let adc_val = adc_13Absolutelybit_from_raw_u16(raw_fieldset.raw());
+///     Ok(adc_val as f32 * 0.5)
+/// }
 /// ```
 ///
-/// In the above example, if the `async` feature is enabled, the expression will be transformed to
-/// `self.some_method_async().await`. If the `blocking` feature is enabled (and `async` is not),
-/// the original `self.some_method().await` will be used, but since it's in a blocking context,
-/// you would typically have a corresponding blocking method defined.
+/// In this scenario:
+/// - With the `async` feature enabled, the expression becomes
+///   `self.ll.battery_charge_current_adc().read_async().await?`, calling an async method.
+/// - With the `blocking` feature enabled (and `async` disabled), it remains
+///   `self.ll.battery_charge_current_adc().read().await?`, typically handled by a blocking method.
 ///
-/// # Note
+/// # Notes
 ///
-/// - The macro expects exactly two arguments: a string literal (the suffix) and an expression.
-/// - The expression must be a valid Rust expression that may contain `.await` calls.
-/// - Feature flags `async` and `blocking` must be defined in the crate using this macro for the conditional compilation to work as intended.
+/// - **Arguments**: The macro requires a string literal suffix (e.g., `"_async"`) and a valid Rust expression.
+/// - **Feature Flags**: Define `async` and `blocking` features in your crate for conditional compilation.
+/// - **Method Definitions**: Ensure corresponding methods (e.g., `read` and `read_async`) are implemented
+///   to match the execution model when using `bisync`.
 #[proc_macro]
 pub fn suffix(input: TokenStream) -> TokenStream {
     let parsed_input = parse_macro_input!(input as SuffixMacroInput);
